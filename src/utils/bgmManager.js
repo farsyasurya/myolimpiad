@@ -100,7 +100,7 @@ class BGMManager {
         const bassEnv = Math.exp(-bassBeatFract * 4.5);
         const bassFreq = (barBeat >= 2 ? currentChord.bass * 1.5 : currentChord.bass);
         const bassWave = Math.sin(2 * Math.PI * bassFreq * t) * 0.7 +
-                         Math.sin(4 * Math.PI * bassFreq * t) * 0.3;
+          Math.sin(4 * Math.PI * bassFreq * t) * 0.3;
         sample += bassWave * bassEnv * 0.35;
       }
 
@@ -121,8 +121,8 @@ class BGMManager {
           const mEnv = Math.exp(-mBeatOffset * 2.8) * Math.min(mBeatOffset * 30, 1);
           const mPhase = 2 * Math.PI * mFreq * t;
           const mWave = Math.sin(mPhase) * 0.65 +
-                        Math.sin(mPhase * 2) * 0.25 +
-                        Math.sin(mPhase * 3) * 0.1;
+            Math.sin(mPhase * 2) * 0.25 +
+            Math.sin(mPhase * 3) * 0.1;
           sample += mWave * mEnv * 0.38;
           break;
         }
@@ -179,17 +179,50 @@ class BGMManager {
     }
   }
 
-  init() {
-    if (this.initialized) return;
+  init(customSrc = null) {
+    if (this.initialized && !customSrc) return;
     try {
-      const blob = this.createAdventureWavBlob();
-      this.blobUrl = URL.createObjectURL(blob);
-      this.audio = new Audio(this.blobUrl);
+      if (customSrc) {
+        if (this.audio) {
+          this.audio.pause();
+        }
+        this.audio = new Audio(customSrc);
+      } else {
+        // Cek file audio custom di public/audio/bgm.mp3
+        const customFile = '/audio/bgm.mp3';
+        this.audio = new Audio(customFile);
+
+        // Jika file audio custom belum ada di public/audio/bgm.mp3,
+        // otomatis fallback ke procedural synthesizer bawaan!
+        this.audio.onerror = () => {
+          if (!this.blobUrl) {
+            const blob = this.createAdventureWavBlob();
+            this.blobUrl = URL.createObjectURL(blob);
+          }
+          if (this.audio.src !== this.blobUrl) {
+            this.audio.src = this.blobUrl;
+            if (this.isPlaying) {
+              this.audio.play().catch(() => { });
+            }
+          }
+        };
+      }
+
       this.audio.loop = true;
       this.audio.volume = this.targetVolume;
       this.initialized = true;
     } catch (e) {
-      console.error('Failed to initialize BGM audio blob:', e);
+      console.error('Failed to initialize BGM audio:', e);
+    }
+  }
+
+  // Method untuk mengganti lagu secara dinamis dengan URL atau path file audio lain
+  setCustomTrack(src) {
+    this.init(src);
+    if (this.isSoundEnabled()) {
+      this.audio.play().then(() => {
+        this.isPlaying = true;
+      }).catch(() => { });
     }
   }
 
@@ -219,7 +252,7 @@ class BGMManager {
                 this.audio.play().then(() => {
                   this.isPlaying = true;
                   sound.init(); // Also unlock Web Audio SFX context
-                }).catch(() => {});
+                }).catch(() => { });
               }
               window.removeEventListener('pointerdown', unlockAudio);
               window.removeEventListener('click', unlockAudio);
