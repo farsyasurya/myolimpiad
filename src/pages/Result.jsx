@@ -1,13 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import HeaderBar from '../components/HeaderBar';
 import GameButton from '../components/GameButton';
 import StarRating from '../components/StarRating';
 import CharacterAvatar from '../components/CharacterAvatar';
-import { getLevelById } from '../services/gameProgressService';
+import { getEventById } from '../services/eventService';
 import { sound } from '../utils/soundEffects';
-import { RotateCcw, Map, ArrowRight, Award, CheckCircle2, XCircle } from 'lucide-react';
+import { RotateCcw, Map, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
 
 export default function Result() {
   const { levelId } = useParams();
@@ -15,18 +15,20 @@ export default function Result() {
   const navigate = useNavigate();
 
   const id = Number(levelId);
-  const level = getLevelById(id);
-
-  // Retrieve score stats from route state or fall back to level progress
   const state = location.state || {};
-  const score = state.score !== undefined ? state.score : level?.bestScore || 0;
-  const stars = state.stars !== undefined ? state.stars : level?.stars || 0;
+  const [levelName, setLevelName] = useState(`Babak ${id}`);
+
+  const searchParams = new URLSearchParams(location.search);
+  const eventId = searchParams.get('eventId') || state.eventId;
+
+  const score = state.score !== undefined ? state.score : 0;
+  const stars = state.stars !== undefined ? state.stars : 0;
   const correctAnswers = state.correctAnswers !== undefined ? state.correctAnswers : Math.round((score / 100) * 5);
   const wrongAnswers = state.wrongAnswers !== undefined ? state.wrongAnswers : 5 - correctAnswers;
 
   const isPassed = stars >= 1 || score >= 50;
   const nextLevelId = id + 1;
-  const hasNextLevel = nextLevelId <= 10;
+  const [hasNextLevel, setHasNextLevel] = useState(true);
 
   useEffect(() => {
     // Sound & Confetti effects
@@ -63,23 +65,36 @@ export default function Result() {
     }
   }, [stars, isPassed]);
 
+  useEffect(() => {
+    if (eventId) {
+      getEventById(eventId).then((evt) => {
+        if (evt && evt.levels) {
+          const l = evt.levels.find((lvl) => lvl.id === id);
+          if (l) setLevelName(l.name);
+          const hasNext = evt.levels.some((lvl) => lvl.id === nextLevelId);
+          setHasNextLevel(hasNext);
+        }
+      }).catch(console.error);
+    }
+  }, [eventId, id, nextLevelId]);
+
   const handlePlayAgain = () => {
     sound.playPop();
-    navigate(`/level/${id}`);
+    navigate(`/level/${id}${eventId ? `?eventId=${eventId}` : ''}`);
   };
 
   const handleNextLevel = () => {
     sound.playPop();
     if (hasNextLevel) {
-      navigate(`/level/${nextLevelId}`);
+      navigate(`/level/${nextLevelId}${eventId ? `?eventId=${eventId}` : ''}`);
     } else {
-      navigate('/map');
+      navigate(eventId ? `/map?eventId=${eventId}` : '/map');
     }
   };
 
   const handleBackToMap = () => {
     sound.playPop();
-    navigate('/map');
+    navigate(eventId ? `/map?eventId=${eventId}` : '/map');
   };
 
   return (
@@ -101,11 +116,11 @@ export default function Result() {
             {stars === 3
               ? 'Luar Biasa Sempurna!'
               : isPassed
-              ? 'Level Selesai!'
-              : 'Ayo Coba Lagi!'}
+                ? 'Level Selesai!'
+                : 'Ayo Coba Lagi!'}
           </h1>
           <p className="text-xs sm:text-sm font-game text-slate-300 mt-1">
-            {level ? `Level ${level.id}: ${level.name}` : `Level ${id}`}
+            {levelName}
           </p>
         </div>
 
@@ -124,8 +139,8 @@ export default function Result() {
               stars === 3
                 ? 'Hebat sekali! Kamu jenius!'
                 : isPassed
-                ? 'Kerja bagus petualang cilik!'
-                : 'Jangan menyerah, kamu pasti bisa!'
+                  ? 'Kerja bagus petualang cilik!'
+                  : 'Jangan menyerah, kamu pasti bisa!'
             }
             size="md"
           />
@@ -165,6 +180,18 @@ export default function Result() {
           </div>
         </div>
 
+        {/* Completion Duration */}
+        {state.durationSeconds !== undefined && state.durationSeconds > 0 && (
+          <div className="w-full text-center py-1 px-3 bg-amber-400/20 border border-amber-400/40 rounded-xl text-xs font-game text-amber-300 mb-1.5 flex items-center justify-center gap-1.5">
+            <span>⏱️ Waktu Pengerjaan:</span>
+            <span className="font-black text-amber-200">
+              {state.durationSeconds >= 60
+                ? `${Math.floor(state.durationSeconds / 60)}m ${state.durationSeconds % 60}s`
+                : `${state.durationSeconds} Detik`}
+            </span>
+          </div>
+        )}
+
         {/* Unlock Notice if next level is unlocked */}
         {isPassed && hasNextLevel && (
           <div className="w-full text-center py-1.5 px-3 bg-emerald-400/20 border border-emerald-400/40 rounded-xl text-xs font-game text-emerald-300 mb-2 animate-pulse">
@@ -198,6 +225,18 @@ export default function Result() {
           >
             Main Lagi
           </GameButton>
+
+          {/* Papan Peringkat (if in event) */}
+          {eventId && (
+            <GameButton
+              variant="purple"
+              size="md"
+              fullWidth
+              onClick={() => navigate(`/leaderboard/${eventId}`)}
+            >
+              Lihat Papan Peringkat Lomba
+            </GameButton>
+          )}
 
           {/* Kembali ke Map */}
           <GameButton

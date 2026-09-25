@@ -1,45 +1,84 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import HeaderBar from '../components/HeaderBar';
-import { getLevelById, getQuestionsForLevel, recordLevelCompletion } from '../services/gameProgressService';
+import { getEventById, recordUserEventScore } from '../services/eventService';
+import { useAuth } from '../context/AuthContext';
 import { sound } from '../utils/soundEffects';
-import { CheckCircle, XCircle, Sparkles, Lightbulb, Calculator } from 'lucide-react';
+import { CheckCircle, XCircle, Calculator, Lightbulb } from 'lucide-react';
 
 export default function Gameplay() {
   const { levelId } = useParams();
+  const [searchParams] = useSearchParams();
+  const eventIdParam = searchParams.get('eventId');
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
 
   const [level, setLevel] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Gameplay state
   const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [wrongAnswers, setWrongAnswers] = useState(0);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  // Timer counter for duration
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const storedEvent = sessionStorage.getItem('activeCompetitionEvent');
+  const targetEventId = eventIdParam || (storedEvent ? JSON.parse(storedEvent).id : null);
 
   useEffect(() => {
-    const lvl = getLevelById(levelId);
-    if (!lvl) {
-      navigate('/map');
+    loadQuizData();
+  }, [levelId, targetEventId]);
+
+  const loadQuizData = async () => {
+    const id = Number(levelId);
+
+    if (!targetEventId) {
+      navigate('/join');
       return;
     }
-    const qList = getQuestionsForLevel(levelId);
-    if (!qList || qList.length === 0) {
-      alert('Pertanyaan untuk level ini belum tersedia.');
-      navigate('/map');
-      return;
+
+    try {
+      const evt = await getEventById(targetEventId);
+      if (evt) {
+        const evtLevel = evt.levels?.find((l) => l.id === id);
+        if (evtLevel) {
+          setLevel({
+            id: evtLevel.id,
+            name: evtLevel.name,
+            theme: evtLevel.theme || 'Kompetisi Matematika'
+          });
+
+          if (evtLevel.questions && evtLevel.questions.length > 0) {
+            setQuestions(evtLevel.questions);
+            return;
+          } else {
+            alert(`Penyelenggara belum menambahkan soal pada ${evtLevel.name}.`);
+            navigate(`/map?eventId=${targetEventId}`);
+            return;
+          }
+        }
+      }
+    } catch (err) {
+      console.error(err);
     }
-    setLevel(lvl);
-    setQuestions(qList);
-  }, [levelId, navigate]);
+
+    navigate('/join');
+  };
 
   if (!level || questions.length === 0) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-slate-900 text-white">
-        <p className="font-game text-base animate-pulse">Menyiapkan soal matematika...</p>
+        <p className="font-game text-sm animate-pulse">Menyiapkan soal matematika...</p>
       </div>
     );
   }
@@ -71,14 +110,14 @@ export default function Gameplay() {
 
     setShowExplanation(true);
 
-    // Give 1.3s for visual feedback before auto advancing
-    setTimeout(() => {
+    setTimeout(async () => {
       if (currentIndex + 1 < totalQ) {
         setCurrentIndex((prev) => prev + 1);
         setSelectedOption(null);
         setIsAnswered(false);
         setShowExplanation(false);
       } else {
+        // Calculate score & stars
         const finalScore = Math.round((newCorrect / totalQ) * 100);
         let finalStars = 0;
         if (finalScore >= 90) {
@@ -91,36 +130,81 @@ export default function Gameplay() {
           finalStars = 0;
         }
 
-        recordLevelCompletion(level.id, finalScore, finalStars, newCorrect, newWrong);
+        // Save to event progress and update leaderboard
+        const isPassed = finalStars >= 1 || finalScore >= 50;
+        const progressKey = `progress_${targetEventId}`;
+        const raw = localStorage.getItem(progressKey);
+        const progress = raw ? JSON.parse(raw) : {};
 
-        navigate(`/result/${level.id}`, {
+        const prevLevel = progress[level.id] || { unlocked: true, completed: false, stars: 0, bestScore: 0 };
+        progress[level.id] = {
+          unlocked: true,
+          completed: prevLevel.completed || isPassed,
+          stars: Math.max(prevLevel.stars, finalStars),
+          bestScore: Math.max(prevLevel.bestScore, finalScore)
+        };
+
+        // Unlock next level in this event
+        const nextLevelId = Number(level.id) + 1;
+        if (isPassed) {
+          if (!progress[nextLevelId]) {
+            progress[nextLevelId] = { unlocked: true, completed: false, stars: 0, bestScore: 0 };
+          } else {
+            progress[nextLevelId].unlocked = true;
+          }
+        }
+        localStorage.setItem(progressKey, JSON.stringify(progress));
+
+        // Save to leaderboard with durationSeconds
+        await recordUserEventScore({
+          eventId: targetEventId,
+          userId: currentUser?.uid || 'guest_' + Date.now(),
+          userName: currentUser?.displayName || 'Peserta',
+          levelId: level.id,
+          score: finalScore,
+          stars: finalStars,
+          durationSeconds: elapsedSeconds
+        });
+
+        navigate(`/result/${level.id}?eventId=${targetEventId}`, {
           state: {
             score: finalScore,
             stars: finalStars,
             correctAnswers: newCorrect,
             wrongAnswers: newWrong,
-            totalQuestions: totalQ
+            totalQuestions: totalQ,
+            durationSeconds: elapsedSeconds,
+            eventId: targetEventId
           }
         });
       }
     }, 1300);
   };
 
+  const formatTimer = (sec) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
   return (
     <div className="relative w-full h-full flex flex-col justify-between bg-gradient-to-b from-sky-500 via-indigo-600 to-purple-800 text-white select-none overflow-hidden">
       {/* 1. Header Navigation */}
       <HeaderBar
-        title={`Level ${level.id}: ${level.name}`}
-        backTo="/map"
+        title={`Babak ${level.id}: ${level.name}`}
+        backTo={eventId ? `/map?eventId=${eventId}` : '/map'}
         showSoundToggle={true}
         className="py-2.5"
       />
 
-      {/* 2. Top Progress & Status Bar (Compact) */}
+      {/* 2. Top Progress & Status Bar with Live Timer */}
       <div className="w-full px-4 pt-2 pb-1 flex flex-col gap-1.5 z-10">
         <div className="flex items-center justify-between text-xs font-game font-bold">
           <span className="px-2.5 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-amber-200 border border-white/20">
             Soal {currentIndex + 1} dari {totalQ}
+          </span>
+          <span className="px-2.5 py-0.5 bg-amber-400/20 backdrop-blur-md rounded-full text-amber-300 border border-amber-400/30">
+            ⏱️ {formatTimer(elapsedSeconds)}
           </span>
           <span className="px-2.5 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-emerald-300 border border-white/20">
             Benar: {correctAnswers}
@@ -136,21 +220,18 @@ export default function Gameplay() {
         </div>
       </div>
 
-      {/* 3. Question Card (Centered & Clean) */}
+      {/* 3. Question Card */}
       <div className="flex-1 flex flex-col justify-center px-4 py-2 z-10 min-h-0">
         <div className="w-full bg-white/95 text-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl border-4 border-amber-300 relative">
-          {/* Level Theme Pill */}
           <div className="inline-flex items-center gap-1 bg-amber-400 text-amber-950 font-game font-black text-[11px] px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-2 shadow-xs border border-yellow-200">
             <Calculator className="w-3 h-3" />
             {level.theme}
           </div>
 
-          {/* Question Text */}
           <h2 className="text-base sm:text-lg font-bold font-game text-slate-800 leading-snug">
             {currentQ.question}
           </h2>
 
-          {/* Explanation Toast when answered */}
           {showExplanation && currentQ.explanation && (
             <div className="mt-2.5 p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 font-medium flex items-start gap-1.5 animate-fade-in">
               <Lightbulb className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -160,7 +241,7 @@ export default function Gameplay() {
         </div>
       </div>
 
-      {/* 4. Options A, B, C, D in a 2x2 Grid: Always 100% visible on screen! */}
+      {/* 4. Options A, B, C, D in 2x2 Grid (All 4 Options Always Visible) */}
       <div className="w-full px-4 pb-4 pt-1 z-10">
         <div className="grid grid-cols-2 gap-2.5">
           {currentQ.options.map((option, idx) => {

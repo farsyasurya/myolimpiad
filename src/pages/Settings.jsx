@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HeaderBar from '../components/HeaderBar';
 import GameButton from '../components/GameButton';
-import { resetGameProgress } from '../services/gameProgressService';
 import { sound } from '../utils/soundEffects';
+import { bgm } from '../utils/bgmManager';
 import { Volume2, VolumeX, RotateCcw, AlertTriangle, Check, Shield } from 'lucide-react';
 
 export default function Settings() {
@@ -15,13 +15,20 @@ export default function Settings() {
   const handleToggleSound = () => {
     const next = !soundEnabled;
     sound.setSoundEnabled(next);
+    bgm.setMuted(!next);
     setSoundEnabled(next);
     if (next) sound.playPop();
   };
 
   const handleReset = () => {
     sound.playPop();
-    resetGameProgress();
+    sessionStorage.removeItem('activeCompetitionEvent');
+    // Clear event progress
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('progress_') || key === 'gameProgress') {
+        localStorage.removeItem(key);
+      }
+    });
     setShowConfirmReset(false);
     setResetSuccess(true);
     setTimeout(() => {

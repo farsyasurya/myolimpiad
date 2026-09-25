@@ -20,6 +20,7 @@ class SoundSystem {
     this.enabled = enabled;
     try {
       localStorage.setItem('gameSoundEnabled', JSON.stringify(enabled));
+      window.dispatchEvent(new CustomEvent('gameSoundChanged', { detail: { enabled } }));
     } catch (e) {
       console.error(e);
     }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import HeaderBar from '../components/HeaderBar';
 import LevelNode from '../components/LevelNode';
 import GameButton from '../components/GameButton';
@@ -8,12 +8,16 @@ import TreeDecoration from '../components/decorations/TreeDecoration';
 import MountainDecoration from '../components/decorations/MountainDecoration';
 import CloudDecoration from '../components/decorations/CloudDecoration';
 import RiverDecoration from '../components/decorations/RiverDecoration';
-import { getAllLevels, getGameStats } from '../services/gameProgressService';
+import { getEventById } from '../services/eventService';
 import { sound } from '../utils/soundEffects';
-import { Play, Trophy, Sparkles, X, Compass, CheckCircle } from 'lucide-react';
+import { Play, Trophy, Sparkles, X, Compass, CheckCircle, Award } from 'lucide-react';
 
 export default function WorldMap() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const eventIdParam = searchParams.get('eventId');
+
+  const [activeEvent, setActiveEvent] = useState(null);
   const [levels, setLevels] = useState([]);
   const [stats, setStats] = useState({ totalStars: 0, completedCount: 0 });
   const [selectedLevel, setSelectedLevel] = useState(null);
@@ -21,19 +25,65 @@ export default function WorldMap() {
   const activeNodeRef = useRef(null);
 
   useEffect(() => {
-    const loadedLevels = getAllLevels();
-    setLevels(loadedLevels);
-    setStats(getGameStats());
-  }, []);
+    loadMapData();
+  }, [eventIdParam]);
 
-  // Determine current active level for the player avatar:
-  // The first unlocked level that is NOT completed, or the latest unlocked level.
+  const loadMapData = async () => {
+    // Check if an event was passed via URL or sessionStorage
+    const storedEvent = sessionStorage.getItem('activeCompetitionEvent');
+    const targetEventId = eventIdParam || (storedEvent ? JSON.parse(storedEvent).id : null);
+
+    if (targetEventId) {
+      try {
+        const evt = await getEventById(targetEventId);
+        if (evt) {
+          setActiveEvent(evt);
+          // Load progress for this event
+          const eventProgressKey = `progress_${evt.id}`;
+          const rawProgress = localStorage.getItem(eventProgressKey);
+          const progress = rawProgress ? JSON.parse(rawProgress) : {};
+
+          const mappedLevels = (evt.levels || []).map((l, idx) => {
+            const userProgress = progress[l.id] || {
+              unlocked: idx === 0, // First level always unlocked
+              completed: false,
+              stars: 0,
+              bestScore: 0
+            };
+            return {
+              id: l.id,
+              name: l.name,
+              theme: l.theme || 'Matematika',
+              description: `Soal babak ${l.id} event ${evt.title}`,
+              unlocked: userProgress.unlocked,
+              completed: userProgress.completed,
+              stars: userProgress.stars,
+              bestScore: userProgress.bestScore,
+              questionCount: l.questions?.length || 0
+            };
+          });
+
+          setLevels(mappedLevels);
+
+          const totalStars = mappedLevels.reduce((acc, l) => acc + (l.stars || 0), 0);
+          const completedCount = mappedLevels.filter((l) => l.completed).length;
+          setStats({ totalStars, completedCount });
+          return;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Jika belum ada event yang dipilih, arahkan ke halaman pilih / join event
+    navigate('/join');
+  };
+
   const currentActiveLevel =
     levels.find((l) => l.unlocked && !l.completed) ||
     [...levels].reverse().find((l) => l.unlocked) ||
     levels[0];
 
-  // Auto-scroll towards active level on mount
   useEffect(() => {
     if (activeNodeRef.current) {
       setTimeout(() => {
@@ -52,21 +102,13 @@ export default function WorldMap() {
 
   const handleStartQuiz = (levelId) => {
     sound.playPop();
-    navigate(`/level/${levelId}`);
+    if (activeEvent) {
+      navigate(`/level/${levelId}?eventId=${activeEvent.id}`);
+    } else {
+      navigate(`/level/${levelId}`);
+    }
   };
 
-  // Horizontal offset positions for 10 levels to create a serpentine adventure curve
-  // percentages relative to container width:
-  // Level 1: 50% (center)
-  // Level 2: 70% (right)
-  // Level 3: 80% (far right)
-  // Level 4: 55% (center-right)
-  // Level 5: 30% (center-left)
-  // Level 6: 20% (far left)
-  // Level 7: 40% (center-left)
-  // Level 8: 65% (center-right)
-  // Level 9: 75% (right)
-  // Level 10: 50% (center summit)
   const horizontalPositions = [
     'justify-center',       // L1
     'justify-end pr-10',    // L2
@@ -84,11 +126,33 @@ export default function WorldMap() {
     <div className="relative w-full h-full flex flex-col bg-slate-900 overflow-hidden">
       {/* Top Fixed Header */}
       <HeaderBar
-        title="Peta Petualangan"
+        title={activeEvent ? activeEvent.title : "Peta Petualangan"}
         backTo="/home"
         starsCount={stats.totalStars}
-        maxStars={30}
+        maxStars={levels.length * 3}
       />
+
+      {/* Competition Event Banner if participating in an event */}
+      {activeEvent && (
+        <div className="w-full bg-slate-950/90 border-b border-amber-400/40 px-4 py-2 flex items-center justify-between text-xs z-30">
+          <div className="flex items-center gap-1.5 truncate">
+            <span className="px-2 py-0.5 rounded-full bg-amber-400 text-amber-950 font-game font-bold text-[10px]">
+              LOMBA: {activeEvent.code}
+            </span>
+            <span className="text-slate-300 font-bold font-game truncate">
+              {activeEvent.title}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate(`/leaderboard/${activeEvent.id}`)}
+            className="flex-shrink-0 ml-2 px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-game font-bold text-[11px] flex items-center gap-1 shadow-sm cursor-pointer"
+          >
+            <Trophy className="w-3 h-3 text-yellow-300" /> Peringkat
+          </button>
+        </div>
+      )}
 
       {/* Scrollable Map Container */}
       <div
@@ -98,7 +162,7 @@ export default function WorldMap() {
           background: 'linear-gradient(180deg, #0ea5e9 0%, #38bdf8 15%, #4ade80 40%, #16a34a 65%, #ca8a04 85%, #78350f 100%)'
         }}
       >
-        {/* Decorative Scenery Elements placed throughout the map */}
+        {/* Scenery */}
         <div className="absolute top-4 left-4 pointer-events-none">
           <CloudDecoration className="w-24 opacity-80" />
         </div>
@@ -120,23 +184,20 @@ export default function WorldMap() {
         <div className="absolute top-[1200px] right-4 pointer-events-none">
           <TreeDecoration type="pine" className="w-14 h-18" />
         </div>
-        <div className="absolute top-[1450px] left-6 pointer-events-none">
-          <MountainDecoration className="w-32 opacity-60" />
-        </div>
 
-        {/* Grand Summit Trophy at the Top / Level 10 End Marker */}
+        {/* Summit Marker */}
         <div className="w-full flex flex-col items-center justify-center my-6 z-10">
           <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-yellow-400 text-amber-950 font-game font-bold text-xs shadow-lg border-2 border-yellow-200 animate-bounce">
             <Trophy className="w-4 h-4 fill-amber-950" />
-            Puncak Menara Juara
+            {activeEvent ? "Puncak Menara Juara MTK" : "Puncak Menara Juara MTK"}
           </div>
         </div>
 
-        {/* 10 Level Nodes Rendered Vertically */}
+        {/* Level Nodes */}
         <div className="relative flex flex-col gap-14 px-4 max-w-md mx-auto z-10">
           {levels.map((level, index) => {
             const isCurrent = currentActiveLevel && currentActiveLevel.id === level.id;
-            const posClass = horizontalPositions[index] || 'justify-center';
+            const posClass = horizontalPositions[index % horizontalPositions.length] || 'justify-center';
 
             return (
               <div
@@ -154,16 +215,16 @@ export default function WorldMap() {
           })}
         </div>
 
-        {/* Start of Journey Marker at the Bottom */}
+        {/* Start Marker */}
         <div className="w-full flex flex-col items-center justify-center mt-12 mb-4 z-10">
           <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/90 text-slate-800 font-game font-bold text-xs shadow-md border-2 border-emerald-400">
             <Compass className="w-4 h-4 text-emerald-600 animate-spin" style={{ animationDuration: '6s' }} />
-            Titik Awal Petualangan
+            Titik Awal Babak 1
           </div>
         </div>
       </div>
 
-      {/* Level Preview / Info Bottom Sheet Modal */}
+      {/* Level Preview Modal */}
       {selectedLevel && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in"
@@ -173,7 +234,6 @@ export default function WorldMap() {
             className="w-full max-w-sm bg-gradient-to-b from-white to-amber-50 rounded-3xl p-5 shadow-2xl border-4 border-amber-300 relative text-slate-800"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close Button */}
             <button
               type="button"
               onClick={() => {
@@ -185,25 +245,22 @@ export default function WorldMap() {
               <X className="w-5 h-5" />
             </button>
 
-            {/* Level Badge Header */}
             <div className="flex flex-col items-center text-center mt-1">
               <span className="px-3 py-1 bg-amber-400 text-amber-950 font-game font-black text-xs rounded-full uppercase tracking-wider mb-2">
-                Level {selectedLevel.id}
+                Babak / Level {selectedLevel.id}
               </span>
               <h2 className="text-2xl font-black font-game text-slate-800">
                 {selectedLevel.name}
               </h2>
               <span className="text-xs font-bold text-amber-700/80 mt-0.5">
-                Tema: {selectedLevel.theme}
+                Materi: {selectedLevel.theme}
               </span>
             </div>
 
-            {/* Level Description */}
             <p className="mt-3 text-sm text-center text-slate-600 bg-white/80 p-3 rounded-2xl border border-amber-200/60">
               {selectedLevel.description}
             </p>
 
-            {/* Stars Earned */}
             <div className="my-4 flex flex-col items-center gap-1.5">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                 Bintang Diperoleh
@@ -216,7 +273,6 @@ export default function WorldMap() {
               )}
             </div>
 
-            {/* Action Button */}
             <GameButton
               variant="success"
               size="lg"

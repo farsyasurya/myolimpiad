@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Star, Volume2, VolumeX, Settings } from 'lucide-react';
 import { sound } from '../utils/soundEffects';
+import { bgm } from '../utils/bgmManager';
 
 export default function HeaderBar({
   title = '',
@@ -27,6 +28,7 @@ export default function HeaderBar({
   const toggleSound = () => {
     const next = !soundOn;
     sound.setSoundEnabled(next);
+    bgm.setMuted(!next);
     setSoundOn(next);
     if (next) sound.playPop();
   };

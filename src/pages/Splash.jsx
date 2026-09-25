@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import CharacterAvatar from '../components/CharacterAvatar';
 import { Compass, Sparkles, BookOpen } from 'lucide-react';
 import { sound } from '../utils/soundEffects';
+import { bgm } from '../utils/bgmManager';
 
 export default function Splash() {
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
+    bgm.start();
+
     const timer = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
@@ -26,6 +29,7 @@ export default function Splash() {
   }, [navigate]);
 
   const handleSkip = () => {
+    bgm.start();
     sound.playPop();
     navigate('/home');
   };
