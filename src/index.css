@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-game {
+    font-family: 'Fredoka', 'Nunito', cursive, sans-serif;
+  }
+}
+
+/* Custom Game 3D Buttons */
+.game-btn-primary {
+  background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+  border-bottom: 5px solid #0369a1;
+  transition: all 0.1s ease-in-out;
+}
+.game-btn-primary:active {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+.game-btn-success {
+  background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%);
+  border-bottom: 5px solid #15803d;
+  transition: all 0.1s ease-in-out;
+}
+.game-btn-success:active {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+.game-btn-warning {
+  background: linear-gradient(180deg, #facc15 0%, #d97706 100%);
+  border-bottom: 5px solid #b45309;
+  transition: all 0.1s ease-in-out;
+}
+.game-btn-warning:active {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+.game-btn-purple {
+  background: linear-gradient(180deg, #c084fc 0%, #9333ea 100%);
+  border-bottom: 5px solid #7e22ce;
+  transition: all 0.1s ease-in-out;
+}
+.game-btn-purple:active {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+.game-btn-rose {
+  background: linear-gradient(180deg, #fb7185 0%, #e11d48 100%);
+  border-bottom: 5px solid #be123c;
+  transition: all 0.1s ease-in-out;
+}
+.game-btn-rose:active {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+.game-btn-neutral {
+  background: linear-gradient(180deg, #f1f5f9 0%, #cbd5e1 100%);
+  border-bottom: 5px solid #94a3b8;
+  transition: all 0.1s ease-in-out;
+}
+.game-btn-neutral:active {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+/* Animations */
+@keyframes bobbing {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-bobbing {
+  animation: bobbing 2.2s ease-in-out infinite;
+}
+
+@keyframes pulse-gentle {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-gentle {
+  animation: pulse-gentle 1.8s ease-in-out infinite;
+}
+
+@keyframes star-pop {
+  0% {
+    transform: scale(0) rotate(-45deg);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.25) rotate(15deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.animate-star-pop {
+  animation: star-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Custom Scrollbar for map */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
