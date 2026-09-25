@@ -8,7 +8,8 @@ import TreeDecoration from '../components/decorations/TreeDecoration';
 import MountainDecoration from '../components/decorations/MountainDecoration';
 import CloudDecoration from '../components/decorations/CloudDecoration';
 import RiverDecoration from '../components/decorations/RiverDecoration';
-import { getEventById } from '../services/eventService';
+import { getEventById, getUserEventProgress } from '../services/eventService';
+import { useAuth } from '../context/AuthContext';
 import { sound } from '../utils/soundEffects';
 import { Play, Trophy, Sparkles, X, Compass, CheckCircle, Award } from 'lucide-react';
 
@@ -16,6 +17,7 @@ export default function WorldMap() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const eventIdParam = searchParams.get('eventId');
+  const { currentUser } = useAuth();
 
   const [activeEvent, setActiveEvent] = useState(null);
   const [levels, setLevels] = useState([]);
@@ -26,7 +28,7 @@ export default function WorldMap() {
 
   useEffect(() => {
     loadMapData();
-  }, [eventIdParam]);
+  }, [eventIdParam, currentUser?.uid]);
 
   const loadMapData = async () => {
     // Check if an event was passed via URL or sessionStorage
@@ -38,10 +40,38 @@ export default function WorldMap() {
         const evt = await getEventById(targetEventId);
         if (evt) {
           setActiveEvent(evt);
-          // Load progress for this event
-          const eventProgressKey = `progress_${evt.id}`;
-          const rawProgress = localStorage.getItem(eventProgressKey);
-          const progress = rawProgress ? JSON.parse(rawProgress) : {};
+
+          // 1. Load local progress
+          const userKey = currentUser?.uid ? `progress_${evt.id}_${currentUser.uid}` : `progress_${evt.id}`;
+          const rawProgress = localStorage.getItem(userKey) || localStorage.getItem(`progress_${evt.id}`);
+          let progress = rawProgress ? JSON.parse(rawProgress) : {};
+
+          // 2. Fetch server progress from Firestore if user logged in
+          if (currentUser?.uid) {
+            try {
+              const serverProg = await getUserEventProgress(evt.id, currentUser.uid);
+              if (serverProg?.levelScores) {
+                Object.entries(serverProg.levelScores).forEach(([lvlId, lvlData]) => {
+                  progress[lvlId] = {
+                    unlocked: true,
+                    completed: true,
+                    stars: lvlData.stars || 0,
+                    bestScore: lvlData.score || 0
+                  };
+                  // Unlock next level
+                  const nextId = Number(lvlId) + 1;
+                  if (!progress[nextId]) {
+                    progress[nextId] = { unlocked: true, completed: false, stars: 0, bestScore: 0 };
+                  } else {
+                    progress[nextId].unlocked = true;
+                  }
+                });
+                localStorage.setItem(userKey, JSON.stringify(progress));
+              }
+            } catch (err) {
+              console.warn("Could not sync server progress:", err);
+            }
+          }
 
           const mappedLevels = (evt.levels || []).map((l, idx) => {
             const userProgress = progress[l.id] || {
@@ -102,12 +132,20 @@ export default function WorldMap() {
 
   const handleStartQuiz = (levelId) => {
     sound.playPop();
+    const targetLvl = levels.find((l) => l.id === levelId);
+    if (targetLvl?.completed) {
+      alert("Babak ini sudah kamu selesaikan dan tidak dapat diulang kembali!");
+      return;
+    }
+
     if (activeEvent) {
       navigate(`/level/${levelId}?eventId=${activeEvent.id}`);
     } else {
       navigate(`/level/${levelId}`);
     }
   };
+
+  const isAllCompleted = levels.length > 0 && levels.every((l) => l.completed);
 
   const horizontalPositions = [
     'justify-center',       // L1
@@ -150,6 +188,26 @@ export default function WorldMap() {
             className="flex-shrink-0 ml-2 px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-game font-bold text-[11px] flex items-center gap-1 shadow-sm cursor-pointer"
           >
             <Trophy className="w-3 h-3 text-yellow-300" /> Peringkat
+          </button>
+        </div>
+      )}
+
+      {/* All Levels Completed Banner */}
+      {isAllCompleted && activeEvent && (
+        <div className="mx-4 mt-2 mb-1 p-3 bg-gradient-to-r from-amber-500/30 via-yellow-500/20 to-amber-500/30 border-2 border-yellow-400/60 rounded-2xl flex items-center justify-between shadow-xl z-30">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-6 h-6 text-yellow-400 shrink-0" />
+            <div>
+              <h4 className="font-game font-bold text-xs text-yellow-300">Semua Babak Telah Selesai!</h4>
+              <p className="text-[10px] text-slate-200">Kamu telah menyelesaikan seluruh perlombaan.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/leaderboard/${activeEvent.id}`)}
+            className="px-3 py-1.5 bg-yellow-400 hover:bg-yellow-300 active:scale-95 text-amber-950 font-game font-black text-xs rounded-xl shadow cursor-pointer shrink-0"
+          >
+            Lihat Peringkat
           </button>
         </div>
       )}
@@ -273,16 +331,49 @@ export default function WorldMap() {
               )}
             </div>
 
-            <GameButton
-              variant="success"
-              size="lg"
-              fullWidth
-              icon={Play}
-              onClick={() => handleStartQuiz(selectedLevel.id)}
-              className="mt-2 text-lg shadow-emerald-900/40"
-            >
-              {selectedLevel.completed ? 'Main Lagi' : 'Mulai Kuis!'}
-            </GameButton>
+            {selectedLevel.completed ? (
+              <div className="flex flex-col gap-2 mt-2">
+                <div className="w-full text-center py-2 px-3 bg-amber-100 border border-amber-300 rounded-xl text-xs font-bold text-amber-900">
+                  🔒 Babak ini sudah kamu selesaikan (1 kali pengerjaan). Babak yang sudah dikerjakan tidak dapat diulang.
+                </div>
+                {currentActiveLevel && !currentActiveLevel.completed && currentActiveLevel.id !== selectedLevel.id && (
+                  <GameButton
+                    variant="success"
+                    size="md"
+                    fullWidth
+                    icon={Play}
+                    onClick={() => {
+                      setSelectedLevel(null);
+                      handleStartQuiz(currentActiveLevel.id);
+                    }}
+                  >
+                    Mainkan Babak {currentActiveLevel.id}
+                  </GameButton>
+                )}
+                {activeEvent && (
+                  <GameButton
+                    variant="purple"
+                    size="md"
+                    fullWidth
+                    icon={Trophy}
+                    onClick={() => navigate(`/leaderboard/${activeEvent.id}`)}
+                  >
+                    Lihat Papan Peringkat
+                  </GameButton>
+                )}
+              </div>
+            ) : (
+              <GameButton
+                variant="success"
+                size="lg"
+                fullWidth
+                icon={Play}
+                onClick={() => handleStartQuiz(selectedLevel.id)}
+                className="mt-2 text-lg shadow-emerald-900/40"
+              >
+                Mulai Kuis!
+              </GameButton>
+            )}
           </div>
         </div>
       )}

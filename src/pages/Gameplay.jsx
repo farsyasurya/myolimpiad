@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import HeaderBar from '../components/HeaderBar';
-import { getEventById, recordUserEventScore } from '../services/eventService';
+import { getEventById, recordUserEventScore, getUserEventProgress } from '../services/eventService';
 import { useAuth } from '../context/AuthContext';
 import { sound } from '../utils/soundEffects';
 import { CheckCircle, XCircle, Calculator, Lightbulb } from 'lucide-react';
@@ -45,6 +45,30 @@ export default function Gameplay() {
     if (!targetEventId) {
       navigate('/join');
       return;
+    }
+
+    // 1. Cek apakah babak ini sudah pernah dikerjakan (aturan lomba: hanya boleh 1 kali pengerjaan)
+    const userKey = currentUser?.uid ? `progress_${targetEventId}_${currentUser.uid}` : `progress_${targetEventId}`;
+    const rawProgress = localStorage.getItem(userKey) || localStorage.getItem(`progress_${targetEventId}`);
+    const localProg = rawProgress ? JSON.parse(rawProgress) : {};
+
+    if (localProg[id]?.completed) {
+      alert(`Kamu sudah pernah menyelesaikan Babak ${id} pada lomba ini. Dalam peraturan lomba, babak yang sudah dikerjakan tidak dapat diulang.`);
+      navigate(`/map?eventId=${targetEventId}`);
+      return;
+    }
+
+    if (currentUser?.uid) {
+      try {
+        const serverProgress = await getUserEventProgress(targetEventId, currentUser.uid);
+        if (serverProgress?.levelScores?.[id]) {
+          alert(`Kamu sudah pernah menyelesaikan Babak ${id} pada lomba ini. Dalam peraturan lomba, babak yang sudah dikerjakan tidak dapat diulang.`);
+          navigate(`/map?eventId=${targetEventId}`);
+          return;
+        }
+      } catch (e) {
+        console.warn(e);
+      }
     }
 
     try {
@@ -132,16 +156,16 @@ export default function Gameplay() {
 
         // Save to event progress and update leaderboard
         const isPassed = finalStars >= 1 || finalScore >= 50;
-        const progressKey = `progress_${targetEventId}`;
-        const raw = localStorage.getItem(progressKey);
+        const userKey = currentUser?.uid ? `progress_${targetEventId}_${currentUser.uid}` : `progress_${targetEventId}`;
+        const raw = localStorage.getItem(userKey) || localStorage.getItem(`progress_${targetEventId}`);
         const progress = raw ? JSON.parse(raw) : {};
 
-        const prevLevel = progress[level.id] || { unlocked: true, completed: false, stars: 0, bestScore: 0 };
         progress[level.id] = {
           unlocked: true,
-          completed: prevLevel.completed || isPassed,
-          stars: Math.max(prevLevel.stars, finalStars),
-          bestScore: Math.max(prevLevel.bestScore, finalScore)
+          completed: true, // Marked permanently completed (1 attempt)
+          stars: finalStars,
+          bestScore: finalScore,
+          durationSeconds: elapsedSeconds
         };
 
         // Unlock next level in this event
@@ -153,7 +177,8 @@ export default function Gameplay() {
             progress[nextLevelId].unlocked = true;
           }
         }
-        localStorage.setItem(progressKey, JSON.stringify(progress));
+        localStorage.setItem(userKey, JSON.stringify(progress));
+        localStorage.setItem(`progress_${targetEventId}`, JSON.stringify(progress));
 
         // Save to leaderboard with durationSeconds
         await recordUserEventScore({

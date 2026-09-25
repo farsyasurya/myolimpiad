@@ -199,6 +199,14 @@ export default function Result() {
           </div>
         )}
 
+        {/* Single Attempt Competition Notice */}
+        {eventId && (
+          <div className="w-full text-center py-1.5 px-3 bg-blue-500/20 border border-blue-400/30 rounded-xl text-xs font-game text-blue-200 mb-1 flex items-center justify-center gap-1.5">
+            <span>🔒</span>
+            <span>Jawaban babak ini telah tersimpan permanen (1 kali pengerjaan).</span>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="w-full flex flex-col gap-2.5 mt-2">
           {/* Level Berikutnya (if passed and has next level) */}
@@ -215,16 +223,18 @@ export default function Result() {
             </GameButton>
           )}
 
-          {/* Main Lagi */}
-          <GameButton
-            variant="warning"
-            size="md"
-            fullWidth
-            icon={RotateCcw}
-            onClick={handlePlayAgain}
-          >
-            Main Lagi
-          </GameButton>
+          {/* Main Lagi (Hanya jika bukan event lomba resmi) */}
+          {!eventId && (
+            <GameButton
+              variant="warning"
+              size="md"
+              fullWidth
+              icon={RotateCcw}
+              onClick={handlePlayAgain}
+            >
+              Main Lagi
+            </GameButton>
+          )}
 
           {/* Papan Peringkat (if in event) */}
           {eventId && (

@@ -369,3 +369,23 @@ export const getEventLeaderboard = async (eventId) => {
   const filtered = boards.filter((b) => b.eventId === eventId);
   return sortLeaderboardList(filtered);
 };
+
+// 11. Get specific User's progress & scores for an Event
+export const getUserEventProgress = async (eventId, userId) => {
+  if (!eventId || !userId) return null;
+
+  try {
+    if (isLiveFirebaseConfigured() && db) {
+      const docRef = doc(db, 'leaderboards', `${eventId}_${userId}`);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        return snap.data();
+      }
+    }
+  } catch (err) {
+    console.warn("Error fetching user progress from Firestore:", err);
+  }
+
+  const boards = getLocalLeaderboards();
+  return boards.find((b) => b.eventId === eventId && b.userId === userId) || null;
+};
