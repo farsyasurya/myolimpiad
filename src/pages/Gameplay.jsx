@@ -192,7 +192,7 @@ export default function Gameplay() {
       {/* 1. Header Navigation */}
       <HeaderBar
         title={`Babak ${level.id}: ${level.name}`}
-        backTo={eventId ? `/map?eventId=${eventId}` : '/map'}
+        backTo={targetEventId ? `/map?eventId=${targetEventId}` : '/map'}
         showSoundToggle={true}
         className="py-2.5"
       />
