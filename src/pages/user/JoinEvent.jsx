@@ -104,7 +104,7 @@ export default function JoinEvent() {
             <h2 className="text-sm font-bold font-game text-white truncate max-w-[170px]">
               {currentUser?.displayName || 'Sahabat Petualang'}
             </h2>
-            <span className="text-[10px] text-slate-400">{currentUser?.email}</span>
+            <span className="text-[10px] text-slate-400">@{currentUser?.username || currentUser?.displayName || 'peserta'}</span>
           </div>
 
           <div className="flex items-center gap-1.5">
