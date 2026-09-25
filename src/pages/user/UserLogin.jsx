@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import HeaderBar from '../../components/HeaderBar';
 import GameButton from '../../components/GameButton';
-import { User, LogIn, UserPlus, Compass } from 'lucide-react';
+import { User, Lock, LogIn, UserPlus, Compass } from 'lucide-react';
 import { sound } from '../../utils/soundEffects';
 
 export default function UserLogin() {
@@ -11,19 +11,20 @@ export default function UserLogin() {
   const { loginWithUsername, loading } = useAuth();
 
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!username.trim()) {
-      setError('Harap masukkan username kamu.');
+    if (!username.trim() || !password) {
+      setError('Harap isi username dan password kamu.');
       return;
     }
 
     try {
-      await loginWithUsername(username);
+      await loginWithUsername(username, password);
       sound.playCorrect();
       navigate('/join');
     } catch (err) {
@@ -45,7 +46,7 @@ export default function UserLogin() {
             Masuk Peserta Lomba
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Cukup masukkan username kamu untuk lanjut bermain dan bersaing di papan peringkat
+            Masukkan username dan password kamu untuk mulai petualangan kuis matematika
           </p>
         </div>
 
@@ -55,7 +56,7 @@ export default function UserLogin() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
           <div>
             <label className="block text-xs font-bold text-slate-300 font-game mb-1.5">
               Username Peserta
@@ -69,12 +70,26 @@ export default function UserLogin() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Contoh: farsya / budi123"
-                className="w-full pl-10 pr-4 py-3 bg-slate-800 border-2 border-slate-700 rounded-2xl text-white text-base focus:border-sky-400 focus:outline-none transition font-game"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border-2 border-slate-700 rounded-2xl text-white text-sm focus:border-sky-400 focus:outline-none transition font-game"
               />
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 pl-1">
-              Gunakan huruf dan angka tanpa spasi
-            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 font-game mb-1.5">
+              Password
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border-2 border-slate-700 rounded-2xl text-white text-sm focus:border-sky-400 focus:outline-none transition"
+              />
+            </div>
           </div>
 
           <GameButton
@@ -86,12 +101,12 @@ export default function UserLogin() {
             disabled={loading}
             className="mt-2 text-base py-3"
           >
-            {loading ? 'Memeriksa...' : 'Mulai Petualangan 🚀'}
+            {loading ? 'Memeriksa...' : 'Masuk & Main 🚀'}
           </GameButton>
         </form>
 
         <div className="mt-8 text-center text-xs text-slate-400">
-          Belum punya username peserta?{' '}
+          Belum punya akun peserta?{' '}
           <Link
             to="/user/register"
             className="text-sky-400 font-bold hover:underline inline-flex items-center gap-1 font-game ml-1"

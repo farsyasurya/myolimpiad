@@ -165,13 +165,18 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Login with Username only (Khusus Peserta Lomba)
-  const loginWithUsername = async (username) => {
+  // Login with Username & Password (Khusus Peserta Lomba)
+  const loginWithUsername = async (username, password) => {
     setLoading(true);
     const cleanUsername = (username || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
     if (!cleanUsername) {
       setLoading(false);
       throw new Error('Harap masukkan username yang valid (huruf/angka tanpa spasi).');
+    }
+
+    if (!password) {
+      setLoading(false);
+      throw new Error('Harap masukkan password kamu.');
     }
 
     try {
@@ -181,6 +186,10 @@ export function AuthProvider({ children }) {
         const snap = await getDoc(userDocRef);
         if (snap.exists()) {
           const profile = snap.data();
+          if (profile.password && profile.password !== password) {
+            throw new Error('Password salah. Silakan periksa kembali password kamu.');
+          }
+
           const sessionUser = {
             uid: docId,
             displayName: profile.displayName || profile.name || username.trim(),
@@ -196,6 +205,10 @@ export function AuthProvider({ children }) {
       const users = getLocalUsers();
       const found = users.find((u) => u.username === cleanUsername || u.uid === docId);
       if (found) {
+        if (found.password && found.password !== password) {
+          throw new Error('Password salah. Silakan periksa kembali password kamu.');
+        }
+
         const sessionUser = {
           uid: found.uid || docId,
           displayName: found.displayName || username.trim(),
@@ -215,8 +228,8 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Register with Username only (Khusus Peserta Lomba)
-  const registerWithUsername = async (username, displayName = null) => {
+  // Register with Username & Password (Khusus Peserta Lomba)
+  const registerWithUsername = async (username, password, displayName = null) => {
     setLoading(true);
     const cleanUsername = (username || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
     if (!cleanUsername) {
@@ -229,6 +242,11 @@ export function AuthProvider({ children }) {
       throw new Error('Username minimal 3 karakter.');
     }
 
+    if (!password || password.length < 4) {
+      setLoading(false);
+      throw new Error('Password minimal 4 karakter.');
+    }
+
     const docId = `participant_${cleanUsername}`;
     const formattedName = (displayName || '').trim() || username.trim();
 
@@ -237,12 +255,13 @@ export function AuthProvider({ children }) {
         const userDocRef = doc(db, 'users', docId);
         const snap = await getDoc(userDocRef);
         if (snap.exists()) {
-          throw new Error(`Username "${cleanUsername}" sudah digunakan peserta lain. Silakan pilih username lain.`);
+          throw new Error(`Username "${cleanUsername}" sudah digunakan peserta lain. Silakan pilih username lain atau login.`);
         }
 
         const userData = {
           uid: docId,
           username: cleanUsername,
+          password,
           displayName: formattedName,
           name: formattedName,
           role: 'user',
@@ -262,12 +281,13 @@ export function AuthProvider({ children }) {
         const users = getLocalUsers();
         const existing = users.find((u) => u.username === cleanUsername || u.uid === docId);
         if (existing) {
-          throw new Error(`Username "${cleanUsername}" sudah digunakan peserta lain. Silakan pilih username lain.`);
+          throw new Error(`Username "${cleanUsername}" sudah digunakan peserta lain. Silakan pilih username lain atau login.`);
         }
 
         const newUser = {
           uid: docId,
           username: cleanUsername,
+          password,
           displayName: formattedName,
           name: formattedName,
           role: 'user',
