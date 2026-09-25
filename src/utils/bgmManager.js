@@ -10,14 +10,40 @@ class BGMManager {
     this.blobUrl = null;
     this.initialized = false;
     this.targetVolume = 0.28;
-    this.autoPlayTriggered = false;
+    this.unlockBound = false;
+    this.unlockHandler = null;
 
     if (typeof window !== 'undefined') {
       window.addEventListener('gameSoundChanged', (e) => {
         const enabled = e.detail?.enabled;
         this.setMuted(!enabled);
       });
+
+      this.setupGlobalUnlock();
     }
+  }
+
+  setupGlobalUnlock() {
+    if (this.unlockBound || typeof document === 'undefined') return;
+
+    this.unlockHandler = () => {
+      if (!this.isPlaying && this.isSoundEnabled()) {
+        this.start();
+      }
+    };
+
+    this.unlockBound = true;
+    ['click', 'touchend', 'keydown'].forEach((evt) => {
+      document.addEventListener(evt, this.unlockHandler, { capture: true, passive: true });
+    });
+  }
+
+  removeGlobalUnlock() {
+    if (!this.unlockBound || !this.unlockHandler || typeof document === 'undefined') return;
+    ['click', 'touchend', 'keydown'].forEach((evt) => {
+      document.removeEventListener(evt, this.unlockHandler, { capture: true, passive: true });
+    });
+    this.unlockBound = false;
   }
 
   isSoundEnabled() {
@@ -234,37 +260,20 @@ class BGMManager {
     if (!this.audio) return;
 
     this.audio.volume = this.targetVolume;
+    sound.init();
+
     const playPromise = this.audio.play();
 
     if (playPromise !== undefined) {
       playPromise
         .then(() => {
           this.isPlaying = true;
-          // Successfully playing automatically!
+          this.removeGlobalUnlock();
         })
         .catch(() => {
-          // Browser autoplay restriction encountered
-          // Attach automatic trigger on first user touch/click anywhere on page
-          if (!this.autoPlayTriggered) {
-            this.autoPlayTriggered = true;
-            const unlockAudio = () => {
-              if (this.isSoundEnabled() && this.audio) {
-                this.audio.play().then(() => {
-                  this.isPlaying = true;
-                  sound.init(); // Also unlock Web Audio SFX context
-                }).catch(() => { });
-              }
-              window.removeEventListener('pointerdown', unlockAudio);
-              window.removeEventListener('click', unlockAudio);
-              window.removeEventListener('touchstart', unlockAudio);
-              window.removeEventListener('keydown', unlockAudio);
-            };
-
-            window.addEventListener('pointerdown', unlockAudio, { once: true, passive: true });
-            window.addEventListener('click', unlockAudio, { once: true, passive: true });
-            window.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
-            window.addEventListener('keydown', unlockAudio, { once: true, passive: true });
-          }
+          this.isPlaying = false;
+          // Autoplay blocked by browser policy: keep global unlock listener active
+          this.setupGlobalUnlock();
         });
     }
   }

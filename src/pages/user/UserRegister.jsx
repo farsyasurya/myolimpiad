@@ -3,34 +3,34 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import HeaderBar from '../../components/HeaderBar';
 import GameButton from '../../components/GameButton';
-import { User, Lock, Sparkles, LogIn } from 'lucide-react';
+import { User, Mail, Lock, Sparkles, LogIn } from 'lucide-react';
 import { sound } from '../../utils/soundEffects';
 
 export default function UserRegister() {
   const navigate = useNavigate();
-  const { registerWithUsername, loading } = useAuth();
+  const { register, loading } = useAuth();
 
-  const [username, setUsername] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!username.trim() || !password) {
-      setError('Harap isi username dan password.');
+    if (!name || !email || !password) {
+      setError('Harap lengkapi semua data.');
       return;
     }
 
-    if (password.length < 4) {
-      setError('Password minimal 4 karakter.');
+    if (password.length < 6) {
+      setError('Password minimal 6 karakter.');
       return;
     }
 
     try {
-      await registerWithUsername(username, password, displayName);
+      await register(name, email, password, 'user');
       sound.playCorrect();
       navigate('/join');
     } catch (err) {
@@ -49,10 +49,10 @@ export default function UserRegister() {
             <Sparkles className="w-8 h-8" />
           </div>
           <h2 className="text-2xl font-black font-game text-emerald-300">
-            Daftar Peserta Baru
+            Daftar Peserta Cilik
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Buat akun dengan username dan password untuk mengikuti olimpiade
+            Buat akun peserta dengan email untuk mengikuti olimpiade dan kuis
           </p>
         </div>
 
@@ -65,7 +65,7 @@ export default function UserRegister() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div>
             <label className="block text-xs font-bold text-slate-300 font-game mb-1">
-              Username Peserta <span className="text-rose-400">*</span>
+              Nama Lengkap / Nama Panggilan
             </label>
             <div className="relative">
               <User className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
@@ -73,20 +73,34 @@ export default function UserRegister() {
                 type="text"
                 required
                 autoFocus
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Contoh: farsya123 / budi_juara"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border-2 border-slate-700 rounded-2xl text-white text-sm focus:border-emerald-400 focus:outline-none transition font-game"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Contoh: Farsya Surya"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border-2 border-slate-700 rounded-2xl text-white text-sm focus:border-emerald-400 focus:outline-none transition"
               />
             </div>
-            <p className="text-[10px] text-slate-400 mt-0.5 pl-1">
-              Huruf & angka tanpa spasi (min. 3 karakter)
-            </p>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-300 font-game mb-1">
-              Password <span className="text-rose-400">*</span>
+              Email
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="farsya@email.com"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border-2 border-slate-700 rounded-2xl text-white text-sm focus:border-emerald-400 focus:outline-none transition"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 font-game mb-1">
+              Password (min. 6 karakter)
             </label>
             <div className="relative">
               <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
@@ -95,29 +109,10 @@ export default function UserRegister() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimal 4 karakter"
+                placeholder="••••••••"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border-2 border-slate-700 rounded-2xl text-white text-sm focus:border-emerald-400 focus:outline-none transition"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-300 font-game mb-1">
-              Nama Lengkap / Panggilan <span className="text-slate-500 text-[10px]">(Opsional)</span>
-            </label>
-            <div className="relative">
-              <User className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Contoh: Farsya Surya"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border-2 border-slate-700 rounded-2xl text-white text-sm focus:border-emerald-400 focus:outline-none transition"
-              />
-            </div>
-            <p className="text-[10px] text-slate-400 mt-0.5 pl-1">
-              Nama yang akan ditampilkan di papan peringkat
-            </p>
           </div>
 
           <GameButton

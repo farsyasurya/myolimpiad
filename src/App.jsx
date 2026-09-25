@@ -33,7 +33,14 @@ export default function App() {
     <AuthProvider>
       <Router>
         {/* Outer Desktop Wrapper: Centers mobile portrait frame on wide screens */}
-        <div className="h-[100dvh] w-full bg-slate-950 flex items-center justify-center p-0 md:py-4 overflow-hidden">
+        <div
+          onClickCapture={() => {
+            if (!bgm.isPlaying && bgm.isSoundEnabled()) {
+              bgm.start();
+            }
+          }}
+          className="h-[100dvh] w-full bg-slate-950 flex items-center justify-center p-0 md:py-4 overflow-hidden"
+        >
           {/* Mobile Portrait Frame */}
           <div className="w-full max-w-md h-full md:h-[844px] md:max-h-[92vh] bg-slate-900 md:rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] relative overflow-hidden border-0 md:border-4 md:border-slate-800 flex flex-col">
             <Routes>

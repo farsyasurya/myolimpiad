@@ -165,154 +165,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Login with Username & Password (Khusus Peserta Lomba)
-  const loginWithUsername = async (username, password) => {
-    setLoading(true);
-    const cleanUsername = (username || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
-    if (!cleanUsername) {
-      setLoading(false);
-      throw new Error('Harap masukkan username yang valid (huruf/angka tanpa spasi).');
-    }
-
-    if (!password) {
-      setLoading(false);
-      throw new Error('Harap masukkan password kamu.');
-    }
-
-    try {
-      const docId = `participant_${cleanUsername}`;
-      if (isLiveFirebaseConfigured() && db) {
-        const userDocRef = doc(db, 'users', docId);
-        const snap = await getDoc(userDocRef);
-        if (snap.exists()) {
-          const profile = snap.data();
-          if (profile.password && profile.password !== password) {
-            throw new Error('Password salah. Silakan periksa kembali password kamu.');
-          }
-
-          const sessionUser = {
-            uid: docId,
-            displayName: profile.displayName || profile.name || username.trim(),
-            username: cleanUsername,
-            role: 'user'
-          };
-          setSession(sessionUser);
-          return { success: true, user: sessionUser };
-        }
-      }
-
-      // Check local storage fallback
-      const users = getLocalUsers();
-      const found = users.find((u) => u.username === cleanUsername || u.uid === docId);
-      if (found) {
-        if (found.password && found.password !== password) {
-          throw new Error('Password salah. Silakan periksa kembali password kamu.');
-        }
-
-        const sessionUser = {
-          uid: found.uid || docId,
-          displayName: found.displayName || username.trim(),
-          username: cleanUsername,
-          role: 'user'
-        };
-        setSession(sessionUser);
-        return { success: true, user: sessionUser };
-      }
-
-      throw new Error(`Username "${username.trim()}" belum terdaftar. Silakan klik Daftar Peserta terlebih dahulu.`);
-    } catch (err) {
-      console.error("Login with username error:", err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Register with Username & Password (Khusus Peserta Lomba)
-  const registerWithUsername = async (username, password, displayName = null) => {
-    setLoading(true);
-    const cleanUsername = (username || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
-    if (!cleanUsername) {
-      setLoading(false);
-      throw new Error('Harap masukkan username (huruf dan angka tanpa spasi).');
-    }
-
-    if (cleanUsername.length < 3) {
-      setLoading(false);
-      throw new Error('Username minimal 3 karakter.');
-    }
-
-    if (!password || password.length < 4) {
-      setLoading(false);
-      throw new Error('Password minimal 4 karakter.');
-    }
-
-    const docId = `participant_${cleanUsername}`;
-    const formattedName = (displayName || '').trim() || username.trim();
-
-    try {
-      if (isLiveFirebaseConfigured() && db) {
-        const userDocRef = doc(db, 'users', docId);
-        const snap = await getDoc(userDocRef);
-        if (snap.exists()) {
-          throw new Error(`Username "${cleanUsername}" sudah digunakan peserta lain. Silakan pilih username lain atau login.`);
-        }
-
-        const userData = {
-          uid: docId,
-          username: cleanUsername,
-          password,
-          displayName: formattedName,
-          name: formattedName,
-          role: 'user',
-          createdAt: new Date().toISOString()
-        };
-        await setDoc(userDocRef, userData);
-
-        const sessionUser = {
-          uid: docId,
-          displayName: formattedName,
-          username: cleanUsername,
-          role: 'user'
-        };
-        setSession(sessionUser);
-        return { success: true, user: sessionUser };
-      } else {
-        const users = getLocalUsers();
-        const existing = users.find((u) => u.username === cleanUsername || u.uid === docId);
-        if (existing) {
-          throw new Error(`Username "${cleanUsername}" sudah digunakan peserta lain. Silakan pilih username lain atau login.`);
-        }
-
-        const newUser = {
-          uid: docId,
-          username: cleanUsername,
-          password,
-          displayName: formattedName,
-          name: formattedName,
-          role: 'user',
-          createdAt: new Date().toISOString()
-        };
-        users.push(newUser);
-        saveLocalUsers(users);
-
-        const sessionUser = {
-          uid: docId,
-          displayName: formattedName,
-          username: cleanUsername,
-          role: 'user'
-        };
-        setSession(sessionUser);
-        return { success: true, user: sessionUser };
-      }
-    } catch (err) {
-      console.error("Register with username error:", err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Logout function
   const logoutUser = async () => {
     try {
@@ -332,8 +184,6 @@ export function AuthProvider({ children }) {
         loading,
         register: registerUser,
         login: loginUser,
-        loginWithUsername,
-        registerWithUsername,
         logout: logoutUser,
         isAdmin: currentUser?.role === 'admin'
       }}
@@ -344,3 +194,4 @@ export function AuthProvider({ children }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
+

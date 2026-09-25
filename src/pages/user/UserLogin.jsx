@@ -3,14 +3,14 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import HeaderBar from '../../components/HeaderBar';
 import GameButton from '../../components/GameButton';
-import { User, Lock, LogIn, UserPlus, Compass } from 'lucide-react';
+import { Mail, Lock, LogIn, UserPlus, Compass } from 'lucide-react';
 import { sound } from '../../utils/soundEffects';
 
 export default function UserLogin() {
   const navigate = useNavigate();
-  const { loginWithUsername, loading } = useAuth();
+  const { login, loading } = useAuth();
 
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -18,13 +18,13 @@ export default function UserLogin() {
     e.preventDefault();
     setError('');
 
-    if (!username.trim() || !password) {
-      setError('Harap isi username dan password kamu.');
+    if (!email || !password) {
+      setError('Harap isi email dan password kamu.');
       return;
     }
 
     try {
-      await loginWithUsername(username, password);
+      await login(email, password, 'user');
       sound.playCorrect();
       navigate('/join');
     } catch (err) {
@@ -46,7 +46,7 @@ export default function UserLogin() {
             Masuk Peserta Lomba
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Masukkan username dan password kamu untuk mulai petualangan kuis matematika
+            Masuk dengan email dan password kamu untuk menyimpan poin dan bersaing di peringkat
           </p>
         </div>
 
@@ -59,18 +59,18 @@ export default function UserLogin() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
           <div>
             <label className="block text-xs font-bold text-slate-300 font-game mb-1.5">
-              Username Peserta
+              Email Peserta
             </label>
             <div className="relative">
-              <User className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+              <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
               <input
-                type="text"
+                type="email"
                 required
                 autoFocus
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Contoh: farsya / budi123"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border-2 border-slate-700 rounded-2xl text-white text-sm focus:border-sky-400 focus:outline-none transition font-game"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="peserta@email.com"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border-2 border-slate-700 rounded-2xl text-white text-sm focus:border-sky-400 focus:outline-none transition"
               />
             </div>
           </div>
@@ -111,7 +111,7 @@ export default function UserLogin() {
             to="/user/register"
             className="text-sky-400 font-bold hover:underline inline-flex items-center gap-1 font-game ml-1"
           >
-            <UserPlus className="w-3.5 h-3.5" /> Daftar di sini
+            <UserPlus className="w-3.5 h-3.5" /> Daftar Akun Baru
           </Link>
         </div>
       </div>

@@ -65,7 +65,7 @@ export default function Home() {
           {currentUser ? (
             <div className="flex items-center gap-1">
               <span className="px-2.5 py-1 bg-white/90 border border-slate-300 text-slate-800 font-game font-bold text-xs rounded-xl truncate max-w-[120px]">
-                {currentUser.displayName || currentUser.username || 'Peserta'}
+                {currentUser.displayName || currentUser.email?.split('@')[0] || 'Peserta'}
               </span>
               <button
                 type="button"
